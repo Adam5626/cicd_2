@@ -1,0 +1,65 @@
+name: "Deploying on Testing Server" 
+
+run-name: | 
+
+      "firstworkflow with devops class triggered by ${{github.actor}} 
+      with ${{github.event_name}} event 
+      on branch ${{github.repository}}" 
+
+on: 
+pull_request: 
+   branches: 
+     - features 
+workflow_dispatch: 
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the files
+      uses: actions/checkout@v4
+    - run: npm install
+    - run: npm run test-API
+    - run: npm run test-react
+    - run: docker build -t frontend
+    - run: docker build -t backend
+    - run: docker-compose up
+
+
+    - name: Deploy to Testing Server
+    uses: easingthemes/ssh-deploy@main
+    env:
+      SSH_PRIVATE_KEY: ${ { secrets.EC2_SSH_KEY_TESTING}}
+      REMOTE_HOST: ${ { secrets.HOST_DNS_TESTING}}
+      REMOTE_USER: ${ { secrets.USERNAME_TESTING}}
+      TARGET: ${ { secrets.TARGET_DIR_TESTING}}
+    
+    - name: Send mail
+    if: always()
+    uses: dawidd6/action-send-mail@v2
+    with:
+      server_address: smtp.gmail.com
+      server_port: 465
+      # user credentials
+      username: ${{ adambinsaleem123@gmail.com }}
+      password: ${{ secrets.PASSWORD }}
+      # email subject
+      subject: ${{ github.job }} job of ${{ github.repository }} has ${{ job.status }}
+      # email body as text
+      body: ${{ github.job }} job in worflow ${{ github.workflow }} of ${{ github.repository }} has ${{ job.status }}
+      # comma-separated string, send email to
+      to: u2020261@giki.edu.pk,sajid.ali@giki.edu.pk
+      # from email name
+      from: Adam Saleem
+
+      - name: Check code coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV }}
+      
+      - name: Code Climate Analysis
+        uses: codeclimate/github-action@v0.2.1
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CODE_CLIMATE}}
